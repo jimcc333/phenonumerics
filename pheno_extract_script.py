@@ -9,7 +9,7 @@ from simba.rw_dfs import *
 
 
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello, yo! This is version 4.6')
+    print('Phenosimba says hello! This is version 5.1')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -94,13 +94,13 @@ def extract_features_userdef(inifile):
             selectBpX_1, selectBpY_1 = (selectBp + '_x', selectBp + '_y')
             selectBpX_2, selectBpY_2 = (selectBp + '_x_shifted', selectBp + '_y_shifted')
             csv_df[colName] = (np.sqrt((csv_df_combined[selectBpX_1] - csv_df_combined[selectBpX_2]) ** 2 + (csv_df_combined[selectBpY_1] - csv_df_combined[selectBpY_2]) ** 2)) / currPixPerMM
-        movementDf = csv_df.filter(movementColNames, axis=1)
-        descriptiveColNames = ['collapsed_sum_of_all_movements', 'collapsed_mean_of_all_movements', 'collapsed_median_of_all_movements', 'collapsed_min_of_all_movements', 'collapsed_max_of_all_movements']
-        csv_df['collapsed_sum_of_all_movements'] = movementDf[movementColNames].sum(axis=1)
-        csv_df['collapsed_mean_of_all_movements'] = movementDf[movementColNames].mean(axis=1)
-        csv_df['collapsed_median_of_all_movements'] = movementDf[movementColNames].median(axis=1)
-        csv_df['collapsed_min_of_all_movements'] = movementDf[movementColNames].min(axis=1)
-        csv_df['collapsed_max_of_all_movements'] = movementDf[movementColNames].max(axis=1)
+        # movementDf = csv_df.filter(movementColNames, axis=1)
+        # descriptiveColNames = ['collapsed_sum_of_all_movements', 'collapsed_mean_of_all_movements', 'collapsed_median_of_all_movements', 'collapsed_min_of_all_movements', 'collapsed_max_of_all_movements']
+        # # csv_df['collapsed_sum_of_all_movements'] = movementDf[movementColNames].sum(axis=1)
+        # csv_df['collapsed_mean_of_all_movements'] = movementDf[movementColNames].mean(axis=1)
+        # csv_df['collapsed_median_of_all_movements'] = movementDf[movementColNames].median(axis=1)
+        # csv_df['collapsed_min_of_all_movements'] = movementDf[movementColNames].min(axis=1)
+        # csv_df['collapsed_max_of_all_movements'] = movementDf[movementColNames].max(axis=1)
 
 
         ########### CALC THE NUMBER OF LOW PROBABILITY DETECTIONS & TOTAL PROBABILITY VALUE FOR ROW###########################################
@@ -108,12 +108,12 @@ def extract_features_userdef(inifile):
         probabilityDf = csv_df.filter(p_cols, axis=1)
         csv_df['Sum_probabilities'] = probabilityDf.sum()
         csv_df['Mean_probabilities'] = probabilityDf.mean()
-        values_in_range_min, values_in_range_max = 0.0, 0.1
-        csv_df["Low_prob_detections_0.1"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
-        values_in_range_min, values_in_range_max = 0.000000000, 0.5
-        csv_df["Low_prob_detections_0.5"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
-        values_in_range_min, values_in_range_max = 0.000000000, 0.75
-        csv_df["Low_prob_detections_0.75"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
+        # values_in_range_min, values_in_range_max = 0.0, 0.1
+        # csv_df["Low_prob_detections_0.1"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
+        # values_in_range_min, values_in_range_max = 0.000000000, 0.5
+        # csv_df["Low_prob_detections_0.5"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
+        # values_in_range_min, values_in_range_max = 0.000000000, 0.75
+        # csv_df["Low_prob_detections_0.75"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
 
 
         ########### CALC CENTROIDS ################################
@@ -275,6 +275,45 @@ def extract_features_userdef(inifile):
                                                  csv_df['side_p']],
                                               axis=0)
 
+        ########### DROP COLUMNS ###########################################
+        csv_df = csv_df.drop([
+            'pup1_x',
+            'pup1_y',
+            'pup1_p',
+            'pup2_x',
+            'pup2_y',
+            'pup2_p',
+            'pup3_x',
+            'pup3_y',
+            'pup3_p',
+            'pup4_x',
+            'pup4_y',
+            'pup4_p',
+            'pup5_x',
+            'pup5_y',
+            'pup5_p',
+            'pup6_x',
+            'pup6_y',
+            'pup6_p',
+            'pup7_x',
+            'pup7_y',
+            'pup7_p',
+            'pup8_x',
+            'pup8_y',
+            'pup8_p',
+            'movement_back_2',
+            'movement_back_4',
+            'movement_back_8',
+            'movement_back_10',
+            'movement_pup1',
+            'movement_pup2',
+            'movement_pup3',
+            'movement_pup4',
+            'movement_pup5',
+            'movement_pup6',
+            'movement_pup7',
+            'movement_pup8'
+        ], axis=1)
 
         ########### SAVE DF ###########################################
         print('Exporting df')
@@ -283,7 +322,7 @@ def extract_features_userdef(inifile):
         csv_df = csv_df.fillna(0)
         #csv_df = csv_df.drop(columns=['index'])
         fileOutName = os.path.basename(currentFile).replace('.' + wfileType, '')
-        savePath = os.path.join(csv_dir_out, fileOutName)
+        savePath = os.path.join(csv_dir_out, fileOutName) + '.csv'
         print('Save path:', savePath)
         save_df(csv_df, wfileType, savePath)
         print('Feature extraction complete for ' + '"' + str(currVidName) + '".')
