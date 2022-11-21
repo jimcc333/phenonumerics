@@ -9,7 +9,7 @@ from simba.rw_dfs import *
 
 
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello, yo! This is version 3.6')
+    print('Phenosimba says hello, yo! This is version 4.6')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -209,8 +209,71 @@ def extract_features_userdef(inifile):
                                                      csv_df['pup8_p']],
                                               axis=0)
 
-        # Calculate
+        # Calculate pups convex hull and avg p
+        print('Calculating pups convext hull')
+        pup_threshold = 0.1
+        dam_threshold = 0.5
+        pups_convex_hull = []
+        pup_avg_p = []
+        high_p_pups = []
+        high_p_dam_bp = []
+        for id, row in csv_df.iterrows():
+            points = []
+            ps = []
+            bps = 0
+            for pup_i in range(8):
+                if row['pup' + str(pup_i+1) + '_p'] > pup_threshold:
+                    points.append([row['pup' + str(pup_i+1) + '_x'], row['pup' + str(pup_i+1) + '_y']])
+                    ps.append(row['pup' + str(pup_i+1) + '_p'])
+            pup_avg_p.append(np.average(ps))
+            high_p_pups.append(len(points))
+            if len(points) < 3:
+                pups_convex_hull.append(0)
+            else:
+                pups_convex_hull.append(ConvexHull(points).volume)
+            for bodypart in bodypartNames:
+                if row[bodypart + '_p'] > dam_threshold:
+                    bps += 1
+            high_p_dam_bp.append(bps)
 
+        csv_df['pups_convex_hull'] = pups_convex_hull
+        csv_df['pup_avg_p'] = pup_avg_p
+        csv_df['high_p_pups'] = high_p_pups
+        csv_df['high_p_dam_bp'] = high_p_dam_bp
+
+        ########### CALC AVG MOVEMENTS ################################
+        print('Calculating avg movements and distances')
+
+        csv_df['back_avg_movement'] = np.ma.average([csv_df['movement_back_2'],
+                                                     csv_df['movement_back_4'],
+                                                     csv_df['movement_back_8'],
+                                                     csv_df['movement_back_10']],
+                                              axis=0)
+        csv_df['head_avg_movement'] = np.ma.average([csv_df['movement_dam_nose'],
+                                                     csv_df['movement_right_eye'],
+                                                     csv_df['movement_left_ear'],
+                                                     csv_df['movement_right_ear']],
+                                              axis=0)
+
+        csv_df['dam_pup_distance'] = np.sqrt((csv_df['dam_centroid_x'] - csv_df['pups_centroid_x'])**2
+                                             + (csv_df['dam_centroid_y'] - csv_df['pups_centroid_y'])**2)
+
+        csv_df['back_length'] = np.sqrt((csv_df['back_2_x'] - csv_df['back_10_x'])**2
+                                             + (csv_df['back_2_y'] - csv_df['back_10_y'])**2)
+
+        csv_df['nose_back10_length'] = np.sqrt((csv_df['dam_nose_x'] - csv_df['back_10_x'])**2
+                                             + (csv_df['dam_nose_y'] - csv_df['back_10_y'])**2)
+
+        csv_df['avg_dam_bp_p'] = np.ma.average([ csv_df['dam_nose_p'],
+                                                 csv_df['left_eye_p'],
+                                                 csv_df['right_eye_p'],
+                                                 csv_df['left_ear_p'],
+                                                 csv_df['right_ear_p'],
+                                                 csv_df['left_shoulder_p'],
+                                                 csv_df['right_shoulder_p'],
+                                                 csv_df['arm_p'],
+                                                 csv_df['side_p']],
+                                              axis=0)
 
 
         ########### SAVE DF ###########################################
