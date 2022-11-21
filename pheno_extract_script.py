@@ -2,13 +2,14 @@ from __future__ import division
 import os
 import pandas as pd
 import numpy as np
+from scipy.spatial import ConvexHull
 from configparser import ConfigParser
 import glob
 from simba.rw_dfs import *
 
 
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello, yo! This is version 2.1')
+    print('Phenosimba says hello, yo! This is version 3.6')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -115,13 +116,112 @@ def extract_features_userdef(inifile):
         csv_df["Low_prob_detections_0.75"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
 
 
+        ########### CALC CENTROIDS ################################
+        print('Calculating dam centroid')
+        csv_df['dam_centroid_x'] = np.ma.average([csv_df['dam_nose_x'],
+                                             csv_df['left_eye_x'],
+                                             csv_df['right_eye_x'],
+                                             csv_df['left_ear_x'],
+                                             csv_df['right_ear_x'],
+                                             csv_df['left_shoulder_x'],
+                                             csv_df['right_shoulder_x'],
+                                             csv_df['arm_x'],
+                                             csv_df['side_x'],
+                                             csv_df['back_2_x'],
+                                             csv_df['back_4_x'],
+                                             csv_df['back_8_x'],
+                                             csv_df['back_10_x']],
+                                             weights=[csv_df['dam_nose_p'],
+                                             csv_df['left_eye_p'],
+                                             csv_df['right_eye_p'],
+                                             csv_df['left_ear_p'],
+                                             csv_df['right_ear_p'],
+                                             csv_df['left_shoulder_p'],
+                                             csv_df['right_shoulder_p'],
+                                             csv_df['arm_p'],
+                                             csv_df['side_p'],
+                                             csv_df['back_2_p'],
+                                             csv_df['back_4_p'],
+                                             csv_df['back_8_p'],
+                                             csv_df['back_10_p']],
+                                              axis=0)
+        csv_df['dam_centroid_y'] = np.ma.average([csv_df['dam_nose_y'],
+                                             csv_df['left_eye_y'],
+                                             csv_df['right_eye_y'],
+                                             csv_df['left_ear_y'],
+                                             csv_df['right_ear_y'],
+                                             csv_df['left_shoulder_y'],
+                                             csv_df['right_shoulder_y'],
+                                             csv_df['arm_y'],
+                                             csv_df['side_y'],
+                                             csv_df['back_2_y'],
+                                             csv_df['back_4_y'],
+                                             csv_df['back_8_y'],
+                                             csv_df['back_10_y']],
+                                             weights=[csv_df['dam_nose_p'],
+                                             csv_df['left_eye_p'],
+                                             csv_df['right_eye_p'],
+                                             csv_df['left_ear_p'],
+                                             csv_df['right_ear_p'],
+                                             csv_df['left_shoulder_p'],
+                                             csv_df['right_shoulder_p'],
+                                             csv_df['arm_p'],
+                                             csv_df['side_p'],
+                                             csv_df['back_2_p'],
+                                             csv_df['back_4_p'],
+                                             csv_df['back_8_p'],
+                                             csv_df['back_10_p']],
+                                              axis=0)
+
+        print('Calculating pups centroid')
+        csv_df['pups_centroid_x'] = np.ma.average([ csv_df['pup1_x'],
+                                                 csv_df['pup2_x'],
+                                                 csv_df['pup3_x'],
+                                                 csv_df['pup4_x'],
+                                                 csv_df['pup5_x'],
+                                                 csv_df['pup6_x'],
+                                                 csv_df['pup7_x'],
+                                                 csv_df['pup8_x']],
+                                             weights=[csv_df['pup1_p'],
+                                                     csv_df['pup2_p'],
+                                                     csv_df['pup3_p'],
+                                                     csv_df['pup4_p'],
+                                                     csv_df['pup5_p'],
+                                                     csv_df['pup6_p'],
+                                                     csv_df['pup7_p'],
+                                                     csv_df['pup8_p']],
+                                              axis=0)
+        csv_df['pups_centroid_y'] = np.ma.average([ csv_df['pup1_y'],
+                                                 csv_df['pup2_y'],
+                                                 csv_df['pup3_y'],
+                                                 csv_df['pup4_y'],
+                                                 csv_df['pup5_y'],
+                                                 csv_df['pup6_y'],
+                                                 csv_df['pup7_y'],
+                                                 csv_df['pup8_y']],
+                                             weights=[csv_df['pup1_p'],
+                                                     csv_df['pup2_p'],
+                                                     csv_df['pup3_p'],
+                                                     csv_df['pup4_p'],
+                                                     csv_df['pup5_p'],
+                                                     csv_df['pup6_p'],
+                                                     csv_df['pup7_p'],
+                                                     csv_df['pup8_p']],
+                                              axis=0)
+
+        # Calculate
+
+
+
         ########### SAVE DF ###########################################
+        print('Exporting df')
         #csv_df = csv_df.loc[:, ~csv_df.T.duplicated(keep='first')]
         csv_df = csv_df.reset_index(drop=True)
         csv_df = csv_df.fillna(0)
         #csv_df = csv_df.drop(columns=['index'])
         fileOutName = os.path.basename(currentFile).replace('.' + wfileType, '')
         savePath = os.path.join(csv_dir_out, fileOutName)
+        print('Save path:', savePath)
         save_df(csv_df, wfileType, savePath)
         print('Feature extraction complete for ' + '"' + str(currVidName) + '".')
 
