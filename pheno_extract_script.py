@@ -9,7 +9,7 @@ from simba.rw_dfs import *
 
 
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello! This is version 5.1')
+    print('Phenosimba says hello! This is version 6.0')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -105,9 +105,9 @@ def extract_features_userdef(inifile):
 
         ########### CALC THE NUMBER OF LOW PROBABILITY DETECTIONS & TOTAL PROBABILITY VALUE FOR ROW###########################################
         print('Calculating pose probability scores...')
-        probabilityDf = csv_df.filter(p_cols, axis=1)
-        csv_df['Sum_probabilities'] = probabilityDf.sum()
-        csv_df['Mean_probabilities'] = probabilityDf.mean()
+        # probabilityDf = csv_df.filter(p_cols, axis=1)
+        # csv_df['Sum_probabilities'] = probabilityDf.sum()
+        # csv_df['Mean_probabilities'] = probabilityDf.mean()
         # values_in_range_min, values_in_range_max = 0.0, 0.1
         # csv_df["Low_prob_detections_0.1"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
         # values_in_range_min, values_in_range_max = 0.000000000, 0.5
@@ -210,7 +210,7 @@ def extract_features_userdef(inifile):
                                               axis=0)
 
         # Calculate pups convex hull and avg p
-        print('Calculating pups convext hull')
+        print('Calculating pups convex hull')
         pup_threshold = 0.1
         dam_threshold = 0.5
         pups_convex_hull = []
@@ -275,32 +275,28 @@ def extract_features_userdef(inifile):
                                                  csv_df['side_p']],
                                               axis=0)
 
+        csv_df['Sum_probabilities'] = csv_df[[
+                                                'dam_nose_p',
+                                                'left_eye_p',
+                                                'right_eye_p',
+                                                'left_ear_p',
+                                                'right_ear_p',
+                                                'left_shoulder_p',
+                                                'right_shoulder_p',
+                                                'arm_p',
+                                                'side_p',
+                                                'pup1_p',
+                                                'pup2_p',
+                                                'pup3_p',
+                                                'pup4_p',
+                                                'pup5_p',
+                                                'pup6_p',
+                                                'pup7_p',
+                                                'pup8_p']].sum(axis=1)
+
+
         ########### DROP COLUMNS ###########################################
         csv_df = csv_df.drop([
-            'pup1_x',
-            'pup1_y',
-            'pup1_p',
-            'pup2_x',
-            'pup2_y',
-            'pup2_p',
-            'pup3_x',
-            'pup3_y',
-            'pup3_p',
-            'pup4_x',
-            'pup4_y',
-            'pup4_p',
-            'pup5_x',
-            'pup5_y',
-            'pup5_p',
-            'pup6_x',
-            'pup6_y',
-            'pup6_p',
-            'pup7_x',
-            'pup7_y',
-            'pup7_p',
-            'pup8_x',
-            'pup8_y',
-            'pup8_p',
             'movement_back_2',
             'movement_back_4',
             'movement_back_8',
