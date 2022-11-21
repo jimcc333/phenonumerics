@@ -8,7 +8,7 @@ from simba.rw_dfs import *
 
 
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello, yo!')
+    print('Phenosimba says hello, yo! This is version 2.1')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -51,7 +51,14 @@ def extract_features_userdef(inifile):
         for j in range(len(roll_windows_values)):
             roll_windows.append(int(fps / roll_windows_values[j]))
         loopy += 1
+
+        # exclude pup body parts from bodypartNames
         bodypartNames = list(poseConfigDf)
+        final_body_part_names = []
+        for part in bodypartNames:
+            if 'pup' not in part:
+                final_body_part_names.append(part)
+
         columnHeaders = []
         columnHeadersShifted = []
         p_cols = []
@@ -69,23 +76,14 @@ def extract_features_userdef(inifile):
         csv_df = csv_df.apply(pd.to_numeric)
         csv_df = csv_df.reset_index(drop=True)
 
+
         ########### CREATE SHIFTED DATAFRAME FOR DISTANCE CALCULATIONS ###########################################
         csv_df_shifted = csv_df.shift(periods=1)
         csv_df_shifted.columns = columnHeadersShifted
         csv_df_combined = pd.concat([csv_df, csv_df_shifted], axis=1, join='inner')
         csv_df_combined = csv_df_combined.fillna(0)
         csv_df_combined = csv_df_combined.reset_index(drop=True)
-        print('Calculating euclidean distances...')
 
-        ########### EUCLIDEAN DISTANCES BETWEEN BODY PARTS###########################################
-        distanceColNames = []
-        for idx in range(len(bodypartNames)-1):
-            for idy in range(idx+1, len(bodypartNames)):
-                colName = 'distance_' + str(bodypartNames[idx]) + '_to_' + str(bodypartNames[idy])
-                distanceColNames.append(colName)
-                firstBpX , firstBpY = (bodypartNames[idx] + '_x', bodypartNames[idx] + '_y')
-                secondBpX, secondBpY = (bodypartNames[idy] + '_x', bodypartNames[idy] + '_y')
-                csv_df[colName] = (np.sqrt((csv_df[firstBpX] - csv_df[secondBpX]) ** 2 + (csv_df[firstBpY]- csv_df[secondBpY]) ** 2)) / currPixPerMM
 
         ########### MOVEMENTS OF ALL BODY PARTS ###########################################
         movementColNames = []
@@ -103,41 +101,6 @@ def extract_features_userdef(inifile):
         csv_df['collapsed_min_of_all_movements'] = movementDf[movementColNames].min(axis=1)
         csv_df['collapsed_max_of_all_movements'] = movementDf[movementColNames].max(axis=1)
 
-        print('Calculating rolling windows data...')
-
-        ########### CALC MEAN, MEDIAN, AND SUM DISTANCES BETWEEN BODY PARTS IN ROLLING WINDOWS ###########################################
-        combinedLists_1 = distanceColNames + movementColNames + descriptiveColNames
-        for i in range(len(roll_windows_values)):
-            for selectedCol in combinedLists_1:
-                colName = 'Mean_' + str(selectedCol) + '_' + str(roll_windows_values[i])
-                csv_df[colName] = csv_df[selectedCol].rolling(roll_windows[i], min_periods=1).mean()
-                colName = 'Sum_' + str(selectedCol) + '_' + str(roll_windows_values[i])
-                csv_df[colName] = csv_df[selectedCol].rolling(roll_windows[i], min_periods=1).sum()
-
-        print('Calculating body part movements...')
-        ########### BODY PART MOVEMENTS RELATIVE TO EACH OTHER ###########################################
-        movementDiffcols = []
-        for idx in range(len(movementColNames)-1):
-            for idy in range(idx+1, len(movementColNames)):
-                colName = 'Movement_difference_' + movementColNames[idx] + '_' + movementColNames[idy]
-                movementDiffcols.append(colName)
-                csv_df[colName] = abs(csv_df[movementColNames[idx]]-csv_df[movementColNames[idy]])
-                movementDiffcols.append(colName)
-                csv_df[colName] = abs(csv_df[movementColNames[idx]]-csv_df[movementColNames[idy]])
-
-        print('Calculating deviations and rank...')
-
-        ########### DEVIATIONS FROM MEAN ###########################################
-        combinedLists_2 = combinedLists_1 + movementDiffcols
-        for column in combinedLists_2:
-            colName = str('Deviation_from_median_') + column
-            csv_df[colName] = csv_df[column].mean() - csv_df[column]
-
-        ########### PERCENTILE RANK ###########################################
-        combinedLists_2 = combinedLists_1 + movementDiffcols
-        for column in combinedLists_2:
-            colName = 'Rank_' + column
-            csv_df[colName] = csv_df[column].rank(pct=True)
 
         ########### CALC THE NUMBER OF LOW PROBABILITY DETECTIONS & TOTAL PROBABILITY VALUE FOR ROW###########################################
         print('Calculating pose probability scores...')
@@ -150,6 +113,7 @@ def extract_features_userdef(inifile):
         csv_df["Low_prob_detections_0.5"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
         values_in_range_min, values_in_range_max = 0.000000000, 0.75
         csv_df["Low_prob_detections_0.75"] = probabilityDf.apply(func=lambda row: count_values_in_range(row, values_in_range_min, values_in_range_max), axis=1)
+
 
         ########### SAVE DF ###########################################
         #csv_df = csv_df.loc[:, ~csv_df.T.duplicated(keep='first')]
