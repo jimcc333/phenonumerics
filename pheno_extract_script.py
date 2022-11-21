@@ -9,7 +9,7 @@ from simba.rw_dfs import *
 
 
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello! This is version 7.7')
+    print('Phenosimba says hello! This is version 8')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -260,6 +260,10 @@ def extract_features_userdef(inifile):
                                                      csv_df['movement_left_ear'],
                                                      csv_df['movement_right_ear']],
                                               axis=0)
+
+        csv_df['sum_pup_movement'] = csv_df['movement_pup1'] + csv_df['movement_pup2'] + csv_df['movement_pup3'] \
+                                    + csv_df['movement_pup4'] + csv_df['movement_pup5'] + csv_df['movement_pup6'] \
+                                    + csv_df['movement_pup7']  + csv_df['movement_pup8']
 
         csv_df['dam_pup_distance'] = np.sqrt((csv_df['dam_centroid_x'] - csv_df['pups_centroid_x'])**2 + (csv_df['dam_centroid_y'] - csv_df['pups_centroid_y'])**2)
         csv_df['head_pup_distance'] = np.sqrt((csv_df['head_centroid_x'] - csv_df['pups_centroid_x'])**2 + (csv_df['head_centroid_y'] - csv_df['pups_centroid_y'])**2)
