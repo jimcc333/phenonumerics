@@ -13,11 +13,10 @@ def show_help():
     print('Must specificy at the input_directory full path:')
     print(' -input_directory:[pickled files input folder full path]')
     print(' -input_file:[pickled file name without .pickle]')
-    print(' -output:[unpickled file full directory path]')
     print(' -max_tracks:#')
     print(' -empty_cell_val:[]')
     print()
-    print('Example: python PhenoPickle.py -input_directory:/full/directory/path -max_tracks:11 -empty_cell_val:null')
+    print('Example: python PhenoPickleRaw.py -input_directory:/full/directory/path -max_tracks:11 -empty_cell_val:null')
     return
 
 
@@ -25,7 +24,7 @@ def unpickle_input(file_path, directory_path, max_tracks, empty_cell_val):
     print('   Unpickling', file_path)
 
     df = pd.read_pickle(file_path)
-    print('   Read pickle file with', len(df), 'tracklets')
+    print('   Read pickle file with', len(df), 'frames containing detections')
 
     body_parts = ['nose', 'eyes', 'ears', 'back1', 'back2', 'back3', 'back4', 'back5', 'back6']
 
@@ -71,7 +70,7 @@ def unpickle_input(file_path, directory_path, max_tracks, empty_cell_val):
     output_file.fillna(empty_cell_val, inplace=True)
     output_file = output_file.sort_values(by='frame')
 
-    output_file_name = file_path.split('.')[-2].split(os.sep)[-1] + 'UNPICKLED.csv'
+    output_file_name = file_path.split('.')[-2].split(os.sep)[-1] + '_UNPICKLED.csv'
 
     output_path = directory_path + os.sep + output_file_name
     print('   Writing output to:', output_path)
@@ -97,8 +96,8 @@ def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, directory_pat
         return
 
     for arg in args:
-        if arg.startswith('-input_directory='):
-            directory_path = arg[len('-input_directory='):]
+        if arg.startswith('-input_directory:'):
+            directory_path = arg[len('-input_directory:'):]
             directory_path = directory_path.replace("'", '')
             directory_path = directory_path.replace('"', '')
     if directory_path is None:
@@ -106,8 +105,8 @@ def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, directory_pat
         return
 
     for arg in args:
-        if arg.startswith('-input_file='):
-            file_name = arg[len('-input_file='):]
+        if arg.startswith('-input_file:'):
+            file_name = arg[len('-input_file:'):]
             input_files = directory_path + os.sep + file_name
     if file_name is None:
         print('Input file not specified, search directory.')
@@ -139,7 +138,6 @@ def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, directory_pat
         if file.endswith('meta.pickle'):
             continue
         unpickle_input(file, directory_path, max_tracks=max_tracks, empty_cell_val=empty_cell_val)
-        break
 
     print('Done unpickling all files.')
     return
