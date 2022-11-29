@@ -8,8 +8,44 @@ import glob
 from simba.rw_dfs import *
 
 
+def calculate_convex_hull(x, y, p, threshold=0.2):
+    if len(x) != len(p):
+        raise ValueError('Got x and p with different lengths')
+
+    selected_points, selected_p = [], []
+    for i in range(len(x)):
+        if p[i] > threshold:
+            selected_points.append([x[i], y[i]])
+            selected_p.append(p[i])
+
+    if len(selected_points) < 3:
+        return 0
+    else:
+        return ConvexHull(selected_points).volume
+
+
+def calculate_weighted_avg(x, p=None, threshold=0.2):
+    if len(x) != len(p):
+        raise ValueError('Got x and p with different lengths')
+
+    selected_x, selected_p = [], []
+    for i in range(len(x)):
+        if p[i] > threshold:
+            selected_x.append(x[i])
+            selected_p.append(p[i])
+
+    if len(selected_x) > 0:
+        return np.ma.average(selected_x, weights=selected_p)
+    else:
+        return np.ma.average(x, weights=p)
+
+
+def count_high_p(p, threshold=0.2):
+    return len([1 for val in p if val > threshold])
+
+
 def extract_features_userdef(inifile):
-    print('Phenosimba says hello! This is version 8')
+    print('Phenosimba says hello! This is version 9')
     config = ConfigParser()
     configFile = str(inifile)
     config.read(configFile)
@@ -25,6 +61,9 @@ def extract_features_userdef(inifile):
     poseConfigDf = pd.read_csv(poseConfigPath, header=None)
     poseConfigDf = list(poseConfigDf[0])
 
+    pup_threshold = 0.1
+    dam_threshold = 0.5
+
     if not os.path.exists(csv_dir_out):
         os.makedirs(csv_dir_out)
 
@@ -33,217 +72,185 @@ def extract_features_userdef(inifile):
 
     roll_windows = []
     roll_windows_values = [1, 2, 5, 8, 15]
-    loopy = 0
 
     filesFound = glob.glob(csv_dir_in + '/*.csv')
     print('Extracting features from ' + str(len(filesFound)) + ' files...')
 
-    ########### CREATE PD FOR RAW DATA AND PD FOR MOVEMENT BETWEEN FRAMES ###########
-    for i in filesFound:
-        currentFile = i
-        currVidName = os.path.basename(currentFile.replace('.csv', ''))
-        currVideoSettings = vidinfDf.loc[vidinfDf['Video'] == currVidName]
+    for currentFile in filesFound:
+        current_video_file = os.path.basename(currentFile.replace('.csv', ''))
+        current_video_settings = vidinfDf.loc[vidinfDf['Video'] == current_video_file]
         try:
-            currPixPerMM = float(currVideoSettings['pixels/mm'])
+            pixels_per_mm = float(current_video_settings['pixels/mm'])
         except TypeError:
-            print('Error: make sure all the videos that are going to be analyzed are represented in the project_folder/logs/video_info.csv file')
-        fps = float(currVideoSettings['fps'])
-        print('Processing ' + '"' + str(currVidName) + '".' + ' Fps: ' + str(fps) + ". mm/ppx: " + str(currPixPerMM))
+            print('Error: Cant find pixels/mm in video settings. Make sure all the videos that are going to be '
+                  'analyzed are represented in the project_folder/logs/video_info.csv file')
+            break
+        fps = float(current_video_settings['fps'])
+        print('Processing', str(current_video_file), '. Fps:', str(fps), '. mm/ppx:', str(pixels_per_mm))
         for j in range(len(roll_windows_values)):
             roll_windows.append(int(fps / roll_windows_values[j]))
-        loopy += 1
 
-        # exclude pup body parts from bodypartNames
-        bodypartNames = list(poseConfigDf)
-        final_body_part_names = []
-        for part in bodypartNames:
-            if 'pup' not in part:
-                final_body_part_names.append(part)
+        # Body parts will be in two categories: dam and pups
+        body_part_names = list(poseConfigDf)
+        dam_body_part_names, pup_body_part_names = [], []
+        for bp in body_part_names:
+            if 'pup' in bp:
+                pup_body_part_names.append(bp)
+            else:
+                dam_body_part_names.append(bp)
 
-        columnHeaders = []
-        columnHeadersShifted = []
-        p_cols = []
-        for bodypart in bodypartNames:
-            colHead1, colHead2, colHead3 = (bodypart + '_x', bodypart + '_y', bodypart + '_p')
-            colHead4, colHead5, colHead6 = (bodypart + '_x_shifted', bodypart + '_y_shifted', bodypart + '_p_shifted')
-            columnHeaders.extend((colHead1, colHead2, colHead3))
-            columnHeadersShifted.extend((colHead4, colHead5, colHead6))
-            p_cols.append(colHead3)
+        column_names = []
+        column_names_shifted = []
+        for bp in body_part_names:
+            colHead1, colHead2, colHead3 = (bp + '_x', bp + '_y', bp + '_p')
+            colHead4, colHead5, colHead6 = (bp + '_x_shifted', bp + '_y_shifted', bp + '_p_shifted')
+            column_names.extend((colHead1, colHead2, colHead3))
+            column_names_shifted.extend((colHead4, colHead5, colHead6))
+
         csv_df = read_df(currentFile, wfileType)
-        csv_df.columns = columnHeaders
+        csv_df.columns = column_names
 
-        csv_df = csv_df.fillna(0)
+        # csv_df = csv_df.fillna(0)
         csv_df = csv_df.drop(csv_df.index[[0]])
         csv_df = csv_df.apply(pd.to_numeric)
         csv_df = csv_df.reset_index(drop=True)
 
+        # Calculate dam points
+        print('Calculating dam points')
 
-        ########### CREATE SHIFTED DATAFRAME FOR DISTANCE CALCULATIONS ###########################################
+        csv_df['arm_x'] = np.where(csv_df['left_armpit_p'] > pup_threshold, csv_df['left_armpit_x'], csv_df['right_armpit_x'])
+        csv_df['arm_y'] = np.where(csv_df['left_armpit_p'] > pup_threshold, csv_df['left_armpit_y'], csv_df['right_armpit_y'])
+        csv_df['arm_p'] = np.where(csv_df['left_armpit_p'] > pup_threshold, csv_df['left_armpit_p'], csv_df['right_armpit_p'])
+
+        csv_df['side_x'] = np.where(csv_df['left_ventrum_side_p'] > pup_threshold, csv_df['left_ventrum_side_x'], csv_df['right_ventrum_side_x'])
+        csv_df['side_y'] = np.where(csv_df['left_ventrum_side_p'] > pup_threshold, csv_df['left_ventrum_side_y'], csv_df['right_ventrum_side_y'])
+        csv_df['side_p'] = np.where(csv_df['left_ventrum_side_p'] > pup_threshold, csv_df['left_ventrum_side_p'], csv_df['right_ventrum_side_p'])
+
+        # Calculate centroids
+        print('Calculating dam centroids')
+        dam_centroid_parts = ['dam_nose',
+                              'left_eye',
+                              'right_eye',
+                              'left_ear',
+                              'right_ear',
+                              'left_shoulder',
+                              'right_shoulder',
+                              'left_armpit',
+                              'right_armpit',
+                              'left_ventrum_side',
+                              'right_ventrum_side',
+                              'back_2',
+                              'back_4',
+                              'back_8',
+                              'back_10']
+        csv_df['dam_centroid_x'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                    [row[str(column) + '_x'] for column in dam_centroid_parts],
+                                                    [row[str(column) + '_p'] for column in dam_centroid_parts]), axis=1)
+        csv_df['dam_centroid_y'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                    [row[str(column) + '_y'] for column in dam_centroid_parts],
+                                                    [row[str(column) + '_p'] for column in dam_centroid_parts]), axis=1)
+
+        dam_head_parts = ['dam_nose',
+                          'left_eye',
+                          'right_eye',
+                          'left_ear',
+                          'right_ear']
+        csv_df['head_centroid_x'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                    [row[str(column) + '_x'] for column in dam_head_parts],
+                                                    [row[str(column) + '_p'] for column in dam_head_parts]), axis=1)
+        csv_df['head_centroid_y'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                    [row[str(column) + '_y'] for column in dam_head_parts],
+                                                    [row[str(column) + '_p'] for column in dam_head_parts]), axis=1)
+
+        print('Calculating single points per pup')
+        for pup in range(8):
+            pup_name = 'pup' + str(pup+1)
+            csv_df[pup_name + '_x'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                                                [row[pup_name + '_nose_x'],
+                                                                                 row[pup_name + '_eyes_x'],
+                                                                                 row[pup_name + '_ears_x'],
+                                                                                 row[pup_name + '_back1_x'],
+                                                                                 row[pup_name + '_back2_x'],
+                                                                                 row[pup_name + '_back3_x'],
+                                                                                 row[pup_name + '_back4_x'],
+                                                                                 row[pup_name + '_back5_x'],
+                                                                                 row[pup_name + '_back6_x']],
+                                                                                [row[pup_name + '_nose_p'],
+                                                                                 row[pup_name + '_eyes_p'],
+                                                                                 row[pup_name + '_ears_p'],
+                                                                                 row[pup_name + '_back1_p'],
+                                                                                 row[pup_name + '_back2_p'],
+                                                                                 row[pup_name + '_back3_p'],
+                                                                                 row[pup_name + '_back4_p'],
+                                                                                 row[pup_name + '_back5_p'],
+                                                                                 row[pup_name + '_back6_p']]), axis=1)
+            csv_df[pup_name + '_y'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                                                [row[pup_name + '_nose_y'],
+                                                                                 row[pup_name + '_eyes_y'],
+                                                                                 row[pup_name + '_ears_y'],
+                                                                                 row[pup_name + '_back1_y'],
+                                                                                 row[pup_name + '_back2_y'],
+                                                                                 row[pup_name + '_back3_y'],
+                                                                                 row[pup_name + '_back4_y'],
+                                                                                 row[pup_name + '_back5_y'],
+                                                                                 row[pup_name + '_back6_y']],
+                                                                                [row[pup_name + '_nose_p'],
+                                                                                 row[pup_name + '_eyes_p'],
+                                                                                 row[pup_name + '_ears_p'],
+                                                                                 row[pup_name + '_back1_p'],
+                                                                                 row[pup_name + '_back2_p'],
+                                                                                 row[pup_name + '_back3_p'],
+                                                                                 row[pup_name + '_back4_p'],
+                                                                                 row[pup_name + '_back5_p'],
+                                                                                 row[pup_name + '_back6_p']]), axis=1)
+
+
+        print('Calculating pups centroid')
+
+        pups = ['pup' + str(i+1) for i in range(8)]
+        csv_df['pups_centroid_x'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                                                [row[p + '_x'] for p in pups],
+                                                                                [row[p + '_p'] for p in pups]), axis=1)
+        csv_df['pups_centroid_y'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                                                [row[p + '_y'] for p in pups],
+                                                                                [row[p + '_p'] for p in pups]), axis=1)
+
+        # Go through every row individually
+        print('Calculating pup convex hull and high probably body part counts')
+        csv_df['pups_convex_hull'] = csv_df.apply(lambda row: calculate_convex_hull(
+                                                            [row['pup' + str(i+1) + '_x'] for i in range(8)],
+                                                            [row['pup' + str(i+1) + '_y'] for i in range(8)],
+                                                            [row['pup' + str(i+1) + '_p'] for i in range(8)]), axis=1)
+
+        csv_df['pup_avg_p'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                            [row['pup' + str(i+1) + '_x'] for i in range(8)]
+                                                            ), axis=1)
+
+        csv_df['high_p_pups'] = csv_df.apply(lambda row: count_high_p(
+                                                            [row['pup' + str(i+1) + '_p'] for i in range(8)]
+                                                            ), axis=1)
+        csv_df['high_p_dam_bp'] = csv_df.apply(lambda row: count_high_p(
+                                                            [row[bp + '_p'] for bp in dam_body_part_names]
+                                                            ), axis=1)
+
+
+        # Create a shifted dataframe for distance calculations
         csv_df_shifted = csv_df.shift(periods=1)
-        csv_df_shifted.columns = columnHeadersShifted
+        csv_df_shifted.columns = column_names_shifted
         csv_df_combined = pd.concat([csv_df, csv_df_shifted], axis=1, join='inner')
         csv_df_combined = csv_df_combined.fillna(0)
         csv_df_combined = csv_df_combined.reset_index(drop=True)
 
+        # Calculate movements
+        print('Calculating movements')
+        movement_columns = dam_body_part_names
+        movement_columns += ['pup' + str(i+1) for i in range(8)]
 
-        ########### MOVEMENTS OF ALL BODY PARTS ###########################################
-        movementColNames = []
-        for selectBp in bodypartNames:
-            colName = 'movement_' + selectBp
-            movementColNames.append(colName)
-            selectBpX_1, selectBpY_1 = (selectBp + '_x', selectBp + '_y')
-            selectBpX_2, selectBpY_2 = (selectBp + '_x_shifted', selectBp + '_y_shifted')
-            csv_df[colName] = (np.sqrt((csv_df_combined[selectBpX_1] - csv_df_combined[selectBpX_2]) ** 2 + (csv_df_combined[selectBpY_1] - csv_df_combined[selectBpY_2]) ** 2)) / currPixPerMM
-
-        ########### CALC CENTROIDS ################################
-        print('Calculating dam centroids')
-        csv_df['dam_centroid_x'] = np.ma.average([csv_df['dam_nose_x'],
-                                             csv_df['left_eye_x'],
-                                             csv_df['right_eye_x'],
-                                             csv_df['left_ear_x'],
-                                             csv_df['right_ear_x'],
-                                             csv_df['left_shoulder_x'],
-                                             csv_df['right_shoulder_x'],
-                                             csv_df['arm_x'],
-                                             csv_df['side_x'],
-                                             csv_df['back_2_x'],
-                                             csv_df['back_4_x'],
-                                             csv_df['back_8_x'],
-                                             csv_df['back_10_x']],
-                                             weights=[csv_df['dam_nose_p'],
-                                             csv_df['left_eye_p'],
-                                             csv_df['right_eye_p'],
-                                             csv_df['left_ear_p'],
-                                             csv_df['right_ear_p'],
-                                             csv_df['left_shoulder_p'],
-                                             csv_df['right_shoulder_p'],
-                                             csv_df['arm_p'],
-                                             csv_df['side_p'],
-                                             csv_df['back_2_p'],
-                                             csv_df['back_4_p'],
-                                             csv_df['back_8_p'],
-                                             csv_df['back_10_p']],
-                                              axis=0)
-        csv_df['dam_centroid_y'] = np.ma.average([csv_df['dam_nose_y'],
-                                             csv_df['left_eye_y'],
-                                             csv_df['right_eye_y'],
-                                             csv_df['left_ear_y'],
-                                             csv_df['right_ear_y'],
-                                             csv_df['left_shoulder_y'],
-                                             csv_df['right_shoulder_y'],
-                                             csv_df['arm_y'],
-                                             csv_df['side_y'],
-                                             csv_df['back_2_y'],
-                                             csv_df['back_4_y'],
-                                             csv_df['back_8_y'],
-                                             csv_df['back_10_y']],
-                                             weights=[csv_df['dam_nose_p'],
-                                             csv_df['left_eye_p'],
-                                             csv_df['right_eye_p'],
-                                             csv_df['left_ear_p'],
-                                             csv_df['right_ear_p'],
-                                             csv_df['left_shoulder_p'],
-                                             csv_df['right_shoulder_p'],
-                                             csv_df['arm_p'],
-                                             csv_df['side_p'],
-                                             csv_df['back_2_p'],
-                                             csv_df['back_4_p'],
-                                             csv_df['back_8_p'],
-                                             csv_df['back_10_p']],
-                                              axis=0)
-        csv_df['head_centroid_x'] = np.ma.average([csv_df['dam_nose_x'],
-                                             csv_df['left_eye_x'],
-                                             csv_df['right_eye_x'],
-                                             csv_df['left_ear_x'],
-                                             csv_df['right_ear_x']],
-                                             weights=[csv_df['dam_nose_p'],
-                                             csv_df['left_eye_p'],
-                                             csv_df['right_eye_p'],
-                                             csv_df['left_ear_p'],
-                                             csv_df['right_ear_p']],
-                                              axis=0)
-        csv_df['head_centroid_y'] = np.ma.average([csv_df['dam_nose_y'],
-                                             csv_df['left_eye_y'],
-                                             csv_df['right_eye_y'],
-                                             csv_df['left_ear_y'],
-                                             csv_df['right_ear_y']],
-                                             weights=[csv_df['dam_nose_p'],
-                                             csv_df['left_eye_p'],
-                                             csv_df['right_eye_p'],
-                                             csv_df['left_ear_p'],
-                                             csv_df['right_ear_p']],
-                                              axis=0)
-
-        print('Calculating pups centroid')
-        csv_df['pups_centroid_x'] = np.ma.average([ csv_df['pup1_x'],
-                                                 csv_df['pup2_x'],
-                                                 csv_df['pup3_x'],
-                                                 csv_df['pup4_x'],
-                                                 csv_df['pup5_x'],
-                                                 csv_df['pup6_x'],
-                                                 csv_df['pup7_x'],
-                                                 csv_df['pup8_x']],
-                                             weights=[csv_df['pup1_p'],
-                                                     csv_df['pup2_p'],
-                                                     csv_df['pup3_p'],
-                                                     csv_df['pup4_p'],
-                                                     csv_df['pup5_p'],
-                                                     csv_df['pup6_p'],
-                                                     csv_df['pup7_p'],
-                                                     csv_df['pup8_p']],
-                                              axis=0)
-        csv_df['pups_centroid_y'] = np.ma.average([ csv_df['pup1_y'],
-                                                 csv_df['pup2_y'],
-                                                 csv_df['pup3_y'],
-                                                 csv_df['pup4_y'],
-                                                 csv_df['pup5_y'],
-                                                 csv_df['pup6_y'],
-                                                 csv_df['pup7_y'],
-                                                 csv_df['pup8_y']],
-                                             weights=[csv_df['pup1_p'],
-                                                     csv_df['pup2_p'],
-                                                     csv_df['pup3_p'],
-                                                     csv_df['pup4_p'],
-                                                     csv_df['pup5_p'],
-                                                     csv_df['pup6_p'],
-                                                     csv_df['pup7_p'],
-                                                     csv_df['pup8_p']],
-                                              axis=0)
-
-        # Calculate pups convex hull and avg p
-        print('Calculating pups convex hull')
-        pup_threshold = 0.1
-        dam_threshold = 0.5
-        pups_convex_hull = []
-        pup_avg_p = []
-        high_p_pups = []
-        high_p_dam_bp = []
-        for id, row in csv_df.iterrows():
-            points = []
-            ps = []
-            bps = 0
-            for pup_i in range(8):
-                if row['pup' + str(pup_i+1) + '_p'] > pup_threshold:
-                    points.append([row['pup' + str(pup_i+1) + '_x'], row['pup' + str(pup_i+1) + '_y']])
-                    ps.append(row['pup' + str(pup_i+1) + '_p'])
-            pup_avg_p.append(np.average(ps))
-            high_p_pups.append(len(points))
-            if len(points) < 3:
-                pups_convex_hull.append(0)
-            else:
-                pups_convex_hull.append(ConvexHull(points).volume)
-            for bodypart in bodypartNames:
-                if row[bodypart + '_p'] > dam_threshold:
-                    bps += 1
-            high_p_dam_bp.append(bps)
-
-        csv_df['pups_convex_hull'] = pups_convex_hull
-        csv_df['pup_avg_p'] = pup_avg_p
-        csv_df['high_p_pups'] = high_p_pups
-        csv_df['high_p_dam_bp'] = high_p_dam_bp
-
-        ########### CALC AVG MOVEMENTS ################################
-        print('Calculating avg movements and distances')
+        for bp in movement_columns:
+            column_name = 'movement_' + bp
+            bpX_1, bpY_1 = (bp + '_x', bp + '_y')
+            bpX_2, bpY_2 = (bp + '_x_shifted', bp + '_y_shifted')
+            csv_df[column_name] = (np.sqrt((csv_df_combined[bpX_1] - csv_df_combined[bpX_2]) ** 2 + (csv_df_combined[bpY_1] - csv_df_combined[bpY_2]) ** 2)) / pixels_per_mm
 
         csv_df['back_avg_movement'] = np.ma.average([csv_df['movement_back_2'],
                                                      csv_df['movement_back_4'],
@@ -265,6 +272,26 @@ def extract_features_userdef(inifile):
                                     + csv_df['movement_pup4'] + csv_df['movement_pup5'] + csv_df['movement_pup6'] \
                                     + csv_df['movement_pup7']  + csv_df['movement_pup8']
 
+        # Moving average of movement
+        print('Calculating moving average of movements')
+        csv_df['head_avg_movement_mavg_30'] = csv_df['head_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['head_avg_movement_mavg_6'] = csv_df['head_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['head_avg_movement_mavg_2'] = csv_df['head_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['head_max_movement_mavg_30'] = csv_df['head_max_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['head_max_movement_mavg_6'] = csv_df['head_max_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['head_max_movement_mavg_2'] = csv_df['head_max_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['back_avg_movement_mavg_30'] = csv_df['back_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['back_avg_movement_mavg_6'] = csv_df['back_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['back_avg_movement_mavg_2'] = csv_df['back_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['head_back_rel_mov_30'] = csv_df['head_avg_movement_mavg_30'] / (csv_df['head_avg_movement_mavg_30'] + csv_df['back_avg_movement_mavg_30'])
+        csv_df['head_back_rel_mov_6'] = csv_df['head_avg_movement_mavg_6'] / (csv_df['head_avg_movement_mavg_6'] + csv_df['back_avg_movement_mavg_6'])
+        csv_df['head_back_rel_mov_2'] = csv_df['head_avg_movement_mavg_2'] / (csv_df['head_avg_movement_mavg_2'] + csv_df['back_avg_movement_mavg_2'])
+
+        # Distance calculations
+        print('Calculating distances')
         csv_df['dam_pup_distance'] = np.sqrt((csv_df['dam_centroid_x'] - csv_df['pups_centroid_x'])**2 + (csv_df['dam_centroid_y'] - csv_df['pups_centroid_y'])**2)
         csv_df['head_pup_distance'] = np.sqrt((csv_df['head_centroid_x'] - csv_df['pups_centroid_x'])**2 + (csv_df['head_centroid_y'] - csv_df['pups_centroid_y'])**2)
 
@@ -306,25 +333,7 @@ def extract_features_userdef(inifile):
                                                 'pup7_p',
                                                 'pup8_p']].sum(axis=1)
 
-        # Moving average of movement
-        print('Starting moving average of movement calculation')
-        csv_df['head_avg_movement_mavg_30'] = csv_df['head_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['head_avg_movement_mavg_6'] = csv_df['head_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['head_avg_movement_mavg_2'] = csv_df['head_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
-
-        csv_df['head_max_movement_mavg_30'] = csv_df['head_max_movement'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['head_max_movement_mavg_6'] = csv_df['head_max_movement'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['head_max_movement_mavg_2'] = csv_df['head_max_movement'].rolling(roll_windows[4], min_periods=1).mean()
-
-        csv_df['back_avg_movement_mavg_30'] = csv_df['back_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['back_avg_movement_mavg_6'] = csv_df['back_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['back_avg_movement_mavg_2'] = csv_df['back_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
-
-        csv_df['head_back_rel_mov_30'] = csv_df['head_avg_movement_mavg_30'] / (csv_df['head_avg_movement_mavg_30'] + csv_df['back_avg_movement_mavg_30'])
-        csv_df['head_back_rel_mov_6'] = csv_df['head_avg_movement_mavg_6'] / (csv_df['head_avg_movement_mavg_6'] + csv_df['back_avg_movement_mavg_6'])
-        csv_df['head_back_rel_mov_2'] = csv_df['head_avg_movement_mavg_2'] / (csv_df['head_avg_movement_mavg_2'] + csv_df['back_avg_movement_mavg_2'])
-
-        ########### DROP COLUMNS ###########################################
+        # Drop columns
         csv_df = csv_df.drop([
             'movement_back_2',
             'movement_back_4',
@@ -340,7 +349,7 @@ def extract_features_userdef(inifile):
             'movement_pup8'
         ], axis=1)
 
-        ########### SAVE DF ###########################################
+        # Save DF
         print('Exporting df')
         #csv_df = csv_df.loc[:, ~csv_df.T.duplicated(keep='first')]
         csv_df = csv_df.reset_index(drop=True)
@@ -350,6 +359,6 @@ def extract_features_userdef(inifile):
         savePath = os.path.join(csv_dir_out, fileOutName) + '.csv'
         print('Save path:', savePath)
         save_df(csv_df, wfileType, savePath)
-        print('Feature extraction complete for ' + '"' + str(currVidName) + '".')
+        print('Feature extraction complete for ' + '"' + str(current_video_file) + '".')
 
     print('All feature extraction complete.')
