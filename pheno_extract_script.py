@@ -25,7 +25,7 @@ def calculate_convex_hull(x, y, p, threshold=0.2):
 
 
 def calculate_weighted_avg(x, p=None, threshold=0.2):
-    if len(x) != len(p):
+    if p is not None and len(x) != len(p):
         raise ValueError('Got x and p with different lengths')
 
     selected_x, selected_p = [], []
@@ -203,7 +203,7 @@ def extract_features_userdef(inifile):
                                                                                  row[pup_name + '_back4_p'],
                                                                                  row[pup_name + '_back5_p'],
                                                                                  row[pup_name + '_back6_p']]), axis=1)
-            
+
             csv_df[pup_name + '_p'] = np.ma.average([csv_df[pup_name + '_nose_y'],
                                                      csv_df[pup_name + '_eyes_y'],
                                                      csv_df[pup_name + '_ears_y'],
