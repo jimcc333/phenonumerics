@@ -29,10 +29,11 @@ def calculate_weighted_avg(x, p=None, threshold=0.2):
         raise ValueError('Got x and p with different lengths')
 
     selected_x, selected_p = [], []
-    for i in range(len(x)):
-        if p[i] > threshold:
-            selected_x.append(x[i])
-            selected_p.append(p[i])
+    if p is not None:
+        for i in range(len(x)):
+            if p[i] > threshold:
+                selected_x.append(x[i])
+                selected_p.append(p[i])
 
     if len(selected_x) > 0:
         return np.ma.average(selected_x, weights=selected_p)
