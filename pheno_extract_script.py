@@ -203,7 +203,16 @@ def extract_features_userdef(inifile):
                                                                                  row[pup_name + '_back4_p'],
                                                                                  row[pup_name + '_back5_p'],
                                                                                  row[pup_name + '_back6_p']]), axis=1)
-
+            
+            csv_df[pup_name + '_p'] = np.ma.average([csv_df[pup_name + '_nose_y'],
+                                                     csv_df[pup_name + '_eyes_y'],
+                                                     csv_df[pup_name + '_ears_y'],
+                                                     csv_df[pup_name + '_back1_y'],
+                                                     csv_df[pup_name + '_back2_y'],
+                                                     csv_df[pup_name + '_back3_y'],
+                                                     csv_df[pup_name + '_back4_y'],
+                                                     csv_df[pup_name + '_back5_y'],
+                                                     csv_df[pup_name + '_back6_y']], axis=0)
 
         print('Calculating pups centroid')
 
