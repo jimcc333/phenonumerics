@@ -6,6 +6,7 @@ from scipy.spatial import ConvexHull
 from configparser import ConfigParser
 import glob
 from simba.rw_dfs import *
+from ellipse import LsqEllipse
 
 
 def calculate_convex_hull(x, y, p, threshold=0.2):
@@ -44,6 +45,24 @@ def calculate_weighted_avg(x, p=None, threshold=0.2):
 
 def count_high_p(p, threshold=0.2):
     return len([1 for val in p if val > threshold])
+
+
+def get_ellipse_parameters(x, y, p, threshold=0.2):
+    selected_x, selected_y = [], []
+    for i in range(len(p)):
+        if p[i] > threshold:
+            selected_x.append(x[i])
+            selected_y.append(y[i])
+
+    if len(selected_x) < 1:
+        return 0, 0
+
+    points = np.array(list(zip(selected_x, selected_y)))
+
+    reg = LsqEllipse().fit(points)
+    center, width, height, phi = reg.as_parameters()
+
+    return width, height
 
 
 def extract_features_userdef(inifile):
@@ -233,39 +252,39 @@ def extract_features_userdef(inifile):
                                                      csv_df['movement_right_ear']], axis=0)
 
         csv_df['head_max_movement'] = np.ma.max([csv_df['movement_dam_nose'],
-                                                     csv_df['movement_right_eye'],
-                                                     csv_df['movement_left_ear'],
-                                                     csv_df['movement_right_ear']], axis=0)
+                                                 csv_df['movement_right_eye'],
+                                                 csv_df['movement_left_ear'],
+                                                 csv_df['movement_right_ear']], axis=0)
 
-        # Moving average of movement
-        print('Calculating moving average of movements')
-        
-        roll_windows = []
-        for j in range(len(roll_windows_values)):
-            roll_windows.append(int(fps / roll_windows_values[j]))
-            
-        csv_df['head_avg_movement_mavg_30'] = csv_df['head_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['head_avg_movement_mavg_6'] = csv_df['head_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['head_avg_movement_mavg_60'] = csv_df['head_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
+        csv_df['ventrum_side_movement'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                [row['movement_left_ventrum_side'], row['movement_right_ventrum_side']],
+                                                [row['left_ventrum_side_p'], row['right_ventrum_side_p']],
+                                                threshold=dam_threshold), axis=1)
 
-        csv_df['head_max_movement_mavg_30'] = csv_df['head_max_movement'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['head_max_movement_mavg_6'] = csv_df['head_max_movement'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['head_max_movement_mavg_60'] = csv_df['head_max_movement'].rolling(roll_windows[4], min_periods=1).mean()
+        csv_df['leg_front_movement'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                [row['movement_left_leg_front'], row['movement_right_leg_front']],
+                                                [row['left_leg_front_p'], row['right_leg_front_p']],
+                                                threshold=dam_threshold), axis=1)
 
-        csv_df['back_avg_movement_mavg_30'] = csv_df['back_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['back_avg_movement_mavg_6'] = csv_df['back_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['back_avg_movement_mavg_60'] = csv_df['back_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
+        csv_df['leg_behind_movement'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                [row['movement_left_leg_behind'], row['movement_right_leg_behind']],
+                                                [row['left_leg_behind_p'], row['right_leg_behind_p']],
+                                                threshold=dam_threshold), axis=1)
 
-        csv_df['head_back_rel_mov_30'] = csv_df['head_avg_movement_mavg_30'] / (csv_df['head_avg_movement_mavg_30'] +
-                                                                                csv_df['back_avg_movement_mavg_30'])
-        csv_df['head_back_rel_mov_6'] = csv_df['head_avg_movement_mavg_6'] / (csv_df['head_avg_movement_mavg_6'] +
-                                                                              csv_df['back_avg_movement_mavg_6'])
-        csv_df['head_back_rel_mov_60'] = csv_df['head_avg_movement_mavg_2'] / (csv_df['head_avg_movement_mavg_60'] +
-                                                                               csv_df['back_avg_movement_mavg_60'])
+        csv_df['wrist_movement'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                [row['movement_left_wrist'], row['movement_right_wrist']],
+                                                [row['left_wrist_p'], row['right_wrist_p']],
+                                                threshold=dam_threshold), axis=1)
 
-        csv_df['pups_convex_hull_mavg_30'] = csv_df['pups_convex_hull'].rolling(roll_windows[0], min_periods=1).mean()
-        csv_df['pups_convex_hull_mavg_6'] = csv_df['pups_convex_hull'].rolling(roll_windows[2], min_periods=1).mean()
-        csv_df['pups_convex_hull_mavg_60'] = csv_df['pups_convex_hull'].rolling(roll_windows[4], min_periods=1).mean()
+        csv_df['armpit_movement'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                [row['movement_left_armpit'], row['movement_right_armpit']],
+                                                [row['left_armpit_p'], row['right_armpit_p']],
+                                                threshold=dam_threshold), axis=1)
+
+        csv_df['shoulder_movement'] = csv_df.apply(lambda row: calculate_weighted_avg(
+                                                [row['movement_left_shoulder'], row['movement_right_shoulder']],
+                                                [row['left_shoulder_p'], row['right_shoulder_p']],
+                                                threshold=dam_threshold), axis=1)
 
         # Distance calculations
         print('Calculating distances')
@@ -307,6 +326,108 @@ def extract_features_userdef(inifile):
                                                 csv_df['side_p']], axis=0)
 
         csv_df['sum_probabilities'] = csv_df[[p + '_p' for p in body_part_names]].sum(axis=1)
+
+        print('Calculating dam back curve fields')
+        back_points_x = ['back_1_center_x', 'back_2_x', 'back_3_x', 'back_4_x', 'back_5_x', 'back_6_x', 'back_7_x',
+                         'back_8_x', 'back_9_x', 'back_10_x']
+        back_points_y = ['back_1_center_y', 'back_2_y', 'back_3_y', 'back_4_y', 'back_5_y', 'back_6_y', 'back_7_y',
+                         'back_8_y', 'back_9_y', 'back_10_y']
+        back_points_p = ['back_1_center_p', 'back_2_p', 'back_3_p', 'back_4_p', 'back_5_p', 'back_6_p', 'back_7_p',
+                         'back_8_p', 'back_9_p', 'back_10_p']
+        csv_df['back_ellipse_width'] = csv_df.apply(lambda row: get_ellipse_parameters(
+                                                [row[p] for p in back_points_x],
+                                                [row[p] for p in back_points_y],
+                                                [row[p] for p in back_points_p],
+                                                threshold=dam_threshold)[0], axis=1)
+        csv_df['back_ellipse_height'] = csv_df.apply(lambda row: get_ellipse_parameters(
+                                                [row[p] for p in back_points_x],
+                                                [row[p] for p in back_points_y],
+                                                [row[p] for p in back_points_p],
+                                                threshold=dam_threshold)[1], axis=1)
+        csv_df['back_ellipse_ratio'] = csv_df.apply(lambda row: row['back_ellipse_width']/row['back_ellipse_height']
+                                                    if row['back_ellipse_height'] > 0 else 0, axis=1)
+
+        # Moving average of movement
+        print('Calculating moving average of movements')
+
+        roll_windows = []
+        for j in range(len(roll_windows_values)):
+            roll_windows.append(int(fps / roll_windows_values[j]))
+
+        csv_df['head_avg_movement_mavg_30'] = csv_df['head_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['head_avg_movement_mavg_6']  = csv_df['head_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['head_avg_movement_mavg_60'] = csv_df['head_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['head_max_movement_mavg_30'] = csv_df['head_max_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['head_max_movement_mavg_6']  = csv_df['head_max_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['head_max_movement_mavg_60'] = csv_df['head_max_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['back_avg_movement_mavg_30'] = csv_df['back_avg_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['back_avg_movement_mavg_6']  = csv_df['back_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['back_avg_movement_mavg_60'] = csv_df['back_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['head_back_rel_mov_30'] = csv_df['head_avg_movement_mavg_30'] / (csv_df['head_avg_movement_mavg_30'] +
+                                                                                csv_df['back_avg_movement_mavg_30'])
+        csv_df['head_back_rel_mov_6']  = csv_df['head_avg_movement_mavg_6'] / (csv_df['head_avg_movement_mavg_6'] +
+                                                                               csv_df['back_avg_movement_mavg_6'])
+        csv_df['head_back_rel_mov_60'] = csv_df['head_avg_movement_mavg_60'] / (csv_df['head_avg_movement_mavg_60'] +
+                                                                                csv_df['back_avg_movement_mavg_60'])
+
+        csv_df['pups_convex_hull_mavg_30'] = csv_df['pups_convex_hull'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['pups_convex_hull_mavg_6']  = csv_df['pups_convex_hull'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['pups_convex_hull_mavg_60'] = csv_df['pups_convex_hull'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['dam_pup_distance_mavg_30'] = csv_df['dam_pup_distance'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['dam_pup_distance_mavg_6']  = csv_df['dam_pup_distance'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['dam_pup_distance_mavg_60'] = csv_df['dam_pup_distance'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['back_ellipse_ratio_mavg_30'] = csv_df['back_ellipse_ratio'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['back_ellipse_ratio_mavg_6']  = csv_df['back_ellipse_ratio'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['back_ellipse_ratio_mavg_60'] = csv_df['back_ellipse_ratio'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['movement_dam_nose_mavg_30'] = csv_df['movement_dam_nose'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['movement_dam_nose_mavg_6']  = csv_df['movement_dam_nose'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['movement_dam_nose_mavg_60'] = csv_df['movement_dam_nose'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['movement_left_eye_mavg_30'] = csv_df['movement_left_eye'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['movement_left_eye_mavg_6']  = csv_df['movement_left_eye'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['movement_left_eye_mavg_60'] = csv_df['movement_left_eye'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['movement_right_eye_mavg_30'] = csv_df['movement_right_eye'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['movement_right_eye_mavg_6']  = csv_df['movement_right_eye'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['movement_right_eye_mavg_60'] = csv_df['movement_right_eye'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['movement_left_ear_mavg_30'] = csv_df['movement_left_ear'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['movement_left_ear_mavg_6']  = csv_df['movement_left_ear'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['movement_left_ear_mavg_60'] = csv_df['movement_left_ear'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['movement_right_ear_mavg_30'] = csv_df['movement_right_ear'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['movement_right_ear_mavg_6']  = csv_df['movement_right_ear'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['movement_right_ear_mavg_60'] = csv_df['movement_right_ear'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['ventrum_side_movement_mavg_30'] = csv_df['ventrum_side_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['ventrum_side_movement_mavg_6']  = csv_df['ventrum_side_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['ventrum_side_movement_mavg_60'] = csv_df['ventrum_side_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['leg_front_movement_mavg_30'] = csv_df['leg_front_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['leg_front_movement_mavg_6']  = csv_df['leg_front_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['leg_front_movement_mavg_60'] = csv_df['leg_front_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['leg_behind_movement_mavg_30'] = csv_df['leg_behind_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['leg_behind_movement_mavg_6']  = csv_df['leg_behind_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['leg_behind_movement_mavg_60'] = csv_df['leg_behind_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['wrist_movement_mavg_30'] = csv_df['wrist_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['wrist_movement_mavg_6']  = csv_df['wrist_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['wrist_movement_mavg_60'] = csv_df['wrist_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['armpit_movement_mavg_30'] = csv_df['armpit_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['armpit_movement_mavg_6']  = csv_df['armpit_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['armpit_movement_mavg_60'] = csv_df['armpit_movement'].rolling(roll_windows[4], min_periods=1).mean()
+
+        csv_df['shoulder_movement_mavg_30'] = csv_df['shoulder_movement'].rolling(roll_windows[0], min_periods=1).mean()
+        csv_df['shoulder_movement_mavg_6']  = csv_df['shoulder_movement'].rolling(roll_windows[2], min_periods=1).mean()
+        csv_df['shoulder_movement_mavg_60'] = csv_df['shoulder_movement'].rolling(roll_windows[4], min_periods=1).mean()
 
         # Save DF
         print('Exporting df')
