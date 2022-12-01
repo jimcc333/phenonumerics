@@ -70,10 +70,6 @@ def extract_features_userdef(inifile):
     if not os.path.exists(csv_dir_out):
         os.makedirs(csv_dir_out)
 
-    def count_values_in_range(series, values_in_range_min, values_in_range_max):
-        return series.between(left=values_in_range_min, right=values_in_range_max).sum()
-
-
     files_found = glob.glob(csv_dir_in + '/*.csv')
     print('Extracting features from ' + str(len(files_found)) + ' files...')
 
@@ -116,13 +112,19 @@ def extract_features_userdef(inifile):
         print('Calculating dam points and areas')
         
         # Collapse arm and side dam points 
-        csv_df['arm_x'] = np.where(csv_df['left_armpit_p'] > dam_threshold, csv_df['left_armpit_x'], csv_df['right_armpit_x'])
-        csv_df['arm_y'] = np.where(csv_df['left_armpit_p'] > dam_threshold, csv_df['left_armpit_y'], csv_df['right_armpit_y'])
-        csv_df['arm_p'] = np.where(csv_df['left_armpit_p'] > dam_threshold, csv_df['left_armpit_p'], csv_df['right_armpit_p'])
+        csv_df['arm_x'] = np.where(csv_df['left_armpit_p'] > dam_threshold, csv_df['left_armpit_x'],
+                                   csv_df['right_armpit_x'])
+        csv_df['arm_y'] = np.where(csv_df['left_armpit_p'] > dam_threshold, csv_df['left_armpit_y'],
+                                   csv_df['right_armpit_y'])
+        csv_df['arm_p'] = np.where(csv_df['left_armpit_p'] > dam_threshold, csv_df['left_armpit_p'],
+                                   csv_df['right_armpit_p'])
 
-        csv_df['side_x'] = np.where(csv_df['left_ventrum_side_p'] > dam_threshold, csv_df['left_ventrum_side_x'], csv_df['right_ventrum_side_x'])
-        csv_df['side_y'] = np.where(csv_df['left_ventrum_side_p'] > dam_threshold, csv_df['left_ventrum_side_y'], csv_df['right_ventrum_side_y'])
-        csv_df['side_p'] = np.where(csv_df['left_ventrum_side_p'] > dam_threshold, csv_df['left_ventrum_side_p'], csv_df['right_ventrum_side_p'])
+        csv_df['side_x'] = np.where(csv_df['left_ventrum_side_p'] > dam_threshold, csv_df['left_ventrum_side_x'],
+                                    csv_df['right_ventrum_side_x'])
+        csv_df['side_y'] = np.where(csv_df['left_ventrum_side_p'] > dam_threshold, csv_df['left_ventrum_side_y'],
+                                    csv_df['right_ventrum_side_y'])
+        csv_df['side_p'] = np.where(csv_df['left_ventrum_side_p'] > dam_threshold, csv_df['left_ventrum_side_p'],
+                                    csv_df['right_ventrum_side_p'])
 
         # Calculate dam centroids and convex hulls
         csv_df['dam_centroid_x'] = csv_df.apply(lambda row: calculate_weighted_avg(
@@ -254,9 +256,12 @@ def extract_features_userdef(inifile):
         csv_df['back_avg_movement_mavg_6'] = csv_df['back_avg_movement'].rolling(roll_windows[2], min_periods=1).mean()
         csv_df['back_avg_movement_mavg_60'] = csv_df['back_avg_movement'].rolling(roll_windows[4], min_periods=1).mean()
 
-        csv_df['head_back_rel_mov_30'] = csv_df['head_avg_movement_mavg_30'] / (csv_df['head_avg_movement_mavg_30'] + csv_df['back_avg_movement_mavg_30'])
-        csv_df['head_back_rel_mov_6'] = csv_df['head_avg_movement_mavg_6'] / (csv_df['head_avg_movement_mavg_6'] + csv_df['back_avg_movement_mavg_6'])
-        csv_df['head_back_rel_mov_60'] = csv_df['head_avg_movement_mavg_2'] / (csv_df['head_avg_movement_mavg_2'] + csv_df['back_avg_movement_mavg_2'])
+        csv_df['head_back_rel_mov_30'] = csv_df['head_avg_movement_mavg_30'] / (csv_df['head_avg_movement_mavg_30'] +
+                                                                                csv_df['back_avg_movement_mavg_30'])
+        csv_df['head_back_rel_mov_6'] = csv_df['head_avg_movement_mavg_6'] / (csv_df['head_avg_movement_mavg_6'] +
+                                                                              csv_df['back_avg_movement_mavg_6'])
+        csv_df['head_back_rel_mov_60'] = csv_df['head_avg_movement_mavg_2'] / (csv_df['head_avg_movement_mavg_60'] +
+                                                                               csv_df['back_avg_movement_mavg_60'])
 
         csv_df['pups_convex_hull_mavg_30'] = csv_df['pups_convex_hull'].rolling(roll_windows[0], min_periods=1).mean()
         csv_df['pups_convex_hull_mavg_6'] = csv_df['pups_convex_hull'].rolling(roll_windows[2], min_periods=1).mean()
