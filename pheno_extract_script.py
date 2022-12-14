@@ -59,10 +59,12 @@ def get_ellipse_parameters(x, y, p, threshold=0.2):
 
     points = np.array(list(zip(selected_x, selected_y)))
 
-    reg = LsqEllipse().fit(points)
-    center, width, height, phi = reg.as_parameters()
-
-    return width, height
+    try:
+        reg = LsqEllipse().fit(points)
+        center, width, height, phi = reg.as_parameters()
+        return width, height
+    except IndexError:
+        return 0.00001, 0.00001
 
 
 def extract_features_userdef(inifile):
@@ -327,7 +329,7 @@ def extract_features_userdef(inifile):
 
         csv_df['sum_probabilities'] = csv_df[[p + '_p' for p in body_part_names]].sum(axis=1)
 
-        print('Calculating dam back curve fields')
+        print('Calculating fields for dam back curve')
         back_points_x = ['back_1_center_x', 'back_2_x', 'back_3_x', 'back_4_x', 'back_5_x', 'back_6_x', 'back_7_x',
                          'back_8_x', 'back_9_x', 'back_10_x']
         back_points_y = ['back_1_center_y', 'back_2_y', 'back_3_y', 'back_4_y', 'back_5_y', 'back_6_y', 'back_7_y',
