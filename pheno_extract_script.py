@@ -54,7 +54,7 @@ def get_ellipse_parameters(x, y, p, threshold=0.2):
             selected_x.append(x[i])
             selected_y.append(y[i])
 
-    if len(selected_x) < 1:
+    if len(selected_x) < 5:
         return 0, 0
 
     points = np.array(list(zip(selected_x, selected_y)))
