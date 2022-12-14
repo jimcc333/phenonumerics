@@ -62,7 +62,7 @@ def get_ellipse_parameters(x, y, p, threshold=0.2):
     try:
         reg = LsqEllipse().fit(points)
         center, width, height, phi = reg.as_parameters()
-        return width, height
+        return np.real(width), np.real(height)
     except IndexError:
         return 0.00001, 0.00001
 
