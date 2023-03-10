@@ -88,8 +88,12 @@ def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, output_path=N
             input_file_paths.append(directory_path + os.sep + file)
     print(len(input_file_paths), 'pickle files found.')
 
+    output_directory = directory_path + 'csvs'
+    os.mkdir(output_directory)
+
     for file_path in input_file_paths:
-        unpickle(file_path, directory_path + 'csvs' + os.sep, max_tracks, empty_cell_val)
+        unpickle(file_path, output_directory + os.sep + file_path.split('.')[-2].split(os.sep)[-1] +
+                 '_UNPICKLED.csv', max_tracks, empty_cell_val)
 
     return
 
