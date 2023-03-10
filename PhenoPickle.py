@@ -8,62 +8,19 @@ import os
 import ruamel.yaml
 
 def show_help():
-    print('PhenoPickkllee!')
-    print('Must specificy at least the input and output full paths:')
-    print(' -input:[pickled file full path]')
-    print(' -output:[unpickled file full directory path]')
-    print(' -max_tracks:#')
-    print(' -empty_cell_val:[]')
+    print('PhenoPickkllee!!')
+    print(' PhenoPickle.py [directory]:[full path of the directory containing pickled files]')
+    print(' -max_tracks:# (optional)')
+    print(' -empty_cell_val:[] (optional)')
     print()
-    print('Example: python PhenoPickle.py -input:/full/path/to/input.pickle -output:full/path/to/output.csv -max_tracks:11 -empty_cell_val:null')
+    print('Example: python PhenoPickle.py /full/path/to/pickles/ -max_tracks:11')
     return
 
 
-# Press the green button in the gutter to run the script.
-def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, output_path=None):
-    print(args)
-    if len(args) == 1:
-        show_help()
-        return
-
-    if args[1] == '-h':
-        show_help()
-        return
-
-    for arg in args:
-        if arg[0:6] == '-input':
-            file_path = arg[7:]
-
-    for arg in args:
-        if arg[0:7] == '-output':
-            output_path = arg[8:]
-            if output_path[-4:] != '.csv':
-                print(output_path)
-                print('Output does not end with .csv!', output_path[-4:])
-                return
-
-    for arg in args:
-        if arg[0:12] == '-max_tracks':
-            max_tracks = arg[13:]
-            print('Max tracks:', max_tracks)
-
-    for arg in args:
-        if arg[0:17] == '-empty_cell_val':
-            empty_cell_val = arg[18:]
-            print('Empty cell val:', empty_cell_val)
-
-    if file_path is None:
-        print('No file path')
-        return
-    if output_path is None:
-        print('No output path')
-        return
-
-    print('Looking at:', output_path)
-    print(output_path)
-
+# function that does all the work
+def unpickle(file_path, output_path, max_tracks, empty_cell_val):
+    print(file_path)
     df = pd.read_pickle(file_path)
-
     print('Read pickle file with', len(df), 'tracklets')
 
     body_parts = ['nose', 'eyes', 'ears', 'back1', 'back2', 'back3', 'back4', 'back5', 'back6']
@@ -99,6 +56,41 @@ def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, output_path=N
 
     output_file.to_csv(output_path)
     print('Done unpickling!')
+
+
+# Press the green button in the gutter to run the script.
+def main(args, max_tracks=12, empty_cell_val='NA', file_path=None, output_path=None):
+    print(args)
+    if len(args) == 1:
+        show_help()
+        return
+
+    if args[1] == '-h':
+        show_help()
+        return
+
+    directory_path = args[1]
+
+    for arg in args:
+        if arg[0:12] == '-max_tracks':
+            max_tracks = arg[13:]
+            print('Max tracks:', max_tracks)
+
+    for arg in args:
+        if arg[0:17] == '-empty_cell_val':
+            empty_cell_val = arg[18:]
+            print('Empty cell val:', empty_cell_val)
+
+    input_file_paths = []
+    files = os.listdir(directory_path)
+    for file in files:
+        if file.endswith('.pickle'):
+            input_file_paths.append(directory_path + os.sep + file)
+    print(len(input_file_paths), 'pickle files found.')
+
+    for file_path in input_file_paths:
+        unpickle(file_path, directory_path + os.sep + 'csvs' + os.sep, max_tracks, empty_cell_val)
+
     return
 
 
